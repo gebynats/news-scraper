@@ -6,35 +6,44 @@ import html2text
 # ========== Konfigurasi Halaman ==========
 st.set_page_config(page_title="Dashboard Berita CNBC Indonesia", layout="wide")
 
-# ========== Custom CSS ==========
+# ========== Custom CSS Dark Mode + Fade-In ==========
 st.markdown("""
     <style>
         .stApp {
-            background: #ffffff;
+            background: #121212;
+        }
+        .fade-in {
+            animation: fadeIn 1s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from {opacity: 0;}
+            to {opacity: 1;}
         }
         .card {
-            background: #f9f9f9;
+            background: #1e1e1e;
             padding: 20px;
             border-radius: 15px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             margin-bottom: 20px;
             min-height: 250px;
+            opacity: 0;
+            animation: fadeIn 1s forwards;
         }
         .title {
             font-size: 18px;
             font-weight: bold;
-            color: #000000;
+            color: #ffffff;
         }
         .summary {
             font-size: 14px;
-            color: #333333;
+            color: #cccccc;
         }
         .time {
             font-size: 12px;
-            color: #555555;
+            color: #999999;
         }
         a {
-            color: #0d6efd;
+            color: #4ea8de;
             text-decoration: none;
             font-weight: bold;
         }
@@ -43,7 +52,7 @@ st.markdown("""
 
 # ========== Judul ==========
 st.title("📈 Dashboard Berita CNBC Indonesia")
-st.subheader("💼 Berita Pasar Modal dan Saham Jawa Barat")
+st.subheader("💼 Berita Pasar Modal dan Saham Jawa Barat (Dark Mode + Animasi)")
 
 # ========== Fungsi Scrape RSS ==========
 def scrape_cnbc_rss():
@@ -75,7 +84,7 @@ if articles:
 
         for idx, art in enumerate(filtered_articles):
             with cols[idx % 3]:
-                st.markdown('<div class="card">', unsafe_allow_html=True)
+                st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
                 st.markdown(f"<div class='title'>📊 {art['title']}</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='time'>🕒 {art['time']}</div>", unsafe_allow_html=True)
                 st.write(f"[🔗 Baca Selengkapnya]({art['link']})")
