@@ -1,36 +1,43 @@
 import streamlit as st
 import requests
+from bs4 import BeautifulSoup
 import pandas as pd
 
-st.set_page_config(page_title="Dashboard Berita Jawa Barat", layout="wide")
+st.set_page_config(page_title="Dashboard Berita Detikcom", layout="wide")
 
-st.title("📊 Dashboard Berita Jawa Barat")
+st.title("📰 Dashboard Berita Jawa Barat dari Detikcom")
 st.subheader("Topik: Pertanian, Manufaktur, Perdagangan")
 
-# ======== Fungsi Ambil Berita ===========
-def get_news(query):
-    API_KEY = 'YOUR_NEWSAPI_KEY'  # Ganti dengan API Key kamu
-    url = f'https://newsapi.org/v2/everything?q={query}&language=id&sortBy=publishedAt&apiKey={API_KEY}'
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json()['articles']
-    else:
-        return []
+# ========== Fungsi Scraping Detikcom ==========
+def scrape_detik(keyword):
+    url = f"https://www.detik.com/search/searchall?query={keyword}+Jawa+Barat&siteid=2"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    response = requests.get(url, headers=headers)
 
-# ======== Ambil Berita Per Topik ===========
+    soup = BeautifulSoup(response.text, 'lxml')
+    articles = soup.find_all('article')
+
+    results = []
+    for article in articles[:5]:  # Ambil 5 berita teratas
+        title = article.find('h2').get_text(strip=True)
+        link = article.find('a')['href']
+        time = article.find('span', class_='date').get_text(strip=True) if article.find('span', class_='date') else '-'
+        results.append({'title': title, 'link': link, 'time': time})
+    
+    return results
+
+# ========== Tampilan Dashboard ==========
 topics = ['pertanian', 'manufaktur', 'perdagangan']
 
 for topic in topics:
     st.header(f'🗞️ Berita {topic.capitalize()}')
-    query = f"Jawa Barat {topic}"
-    articles = get_news(query)
+    articles = scrape_detik(topic)
 
     if articles:
-        for article in articles[:5]:  # Batasi 5 berita per topik
+        for article in articles:
             st.write(f"### {article['title']}")
-            st.write(article['description'])
-            st.write(f"[Baca Selengkapnya]({article['url']})")
-            st.write(f"*{article['publishedAt']}*")
+            st.write(f"[Baca Selengkapnya]({article['link']})")
+            st.write(f"*{article['time']}*")
             st.write("---")
     else:
         st.write("Tidak ada berita terbaru untuk topik ini.")
