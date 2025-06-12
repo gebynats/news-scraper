@@ -5,8 +5,8 @@ import pandas as pd
 
 st.set_page_config(page_title="Dashboard Berita Detikcom", layout="wide")
 
-st.title("📰 Dashboard Berita Jawa Barat dari Detikcom")
-st.subheader("Topik: Pertanian, Manufaktur, Perdagangan")
+st.title("📰 Dashboard Berita Saham")
+st.subheader("Topik: Saham")
 
 # ========== Fungsi Scraping Detikcom ==========
 def scrape_detik(keyword):
@@ -27,7 +27,7 @@ def scrape_detik(keyword):
     return results
 
 # ========== Tampilan Dashboard ==========
-topics = ['pertanian', 'manufaktur', 'perdagangan']
+topics = ['saham']
 
 for topic in topics:
     st.header(f'🗞️ Berita {topic.capitalize()}')
