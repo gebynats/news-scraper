@@ -2,6 +2,9 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 
+# ✅ Ini HARUS baris pertama
+st.set_page_config(page_title="Dashboard Berita CNBC Indonesia", layout="wide")
+
 # ========== Custom CSS for Background & Card ==========
 def load_custom_css():
     st.markdown("""
@@ -23,8 +26,6 @@ def load_custom_css():
         """, unsafe_allow_html=True)
 
 load_custom_css()
-
-st.set_page_config(page_title="Dashboard Berita CNBC Indonesia", layout="wide")
 
 st.title("📈 Dashboard Berita CNBC Indonesia")
 st.subheader("Topik: Saham & Pasar Modal di Jawa Barat")
