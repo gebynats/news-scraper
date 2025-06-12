@@ -1,92 +1,82 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
+import html2text
 
-# ✅ Ini HARUS baris pertama
+# ========== Konfigurasi Halaman ==========
 st.set_page_config(page_title="Dashboard Berita CNBC Indonesia", layout="wide")
 
-# ========== Custom CSS for Background & Card ==========
-def load_custom_css():
-    st.markdown("""
-        <style>
-            body {
-                background: linear-gradient(to right, #e0f7fa, #80deea);
-            }
-            .stApp {
-                background: linear-gradient(to right, #e0f7fa, #80deea);
-            }
-            .card {
-                background-color: white;
-                padding: 20px;
-                border-radius: 15px;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-                margin-bottom: 20px;
-            }
-        </style>
-        """, unsafe_allow_html=True)
+# ========== Custom CSS ==========
+st.markdown("""
+    <style>
+        .stApp {
+            background: linear-gradient(to right, #f0f8ff, #e6f7ff);
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            min-height: 250px;
+        }
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333333;
+        }
+        .summary {
+            font-size: 14px;
+            color: #555555;
+        }
+        .time {
+            font-size: 12px;
+            color: #888888;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-load_custom_css()
-
+# ========== Judul ==========
 st.title("📈 Dashboard Berita CNBC Indonesia")
-st.subheader("Topik: Saham & Pasar Modal di Jawa Barat")
+st.subheader("💼 Berita Pasar Modal dan Saham Jawa Barat")
 
-# ========== Fungsi Scraping CNBC ==========
-def scrape_cnbc():
-    url = 'https://www.cnbcindonesia.com/market'
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    response = requests.get(url, headers=headers)
-
-    soup = BeautifulSoup(response.text, 'html.parser')
-    articles = soup.find_all('div', class_='list media_rows middle thumb')
-
+# ========== Fungsi Scrape RSS ==========
+def scrape_cnbc_rss():
+    RSS_URL = "https://www.cnbcindonesia.com/market/rss"
+    resp = requests.get(RSS_URL)
+    soup = BeautifulSoup(resp.text, "xml")
+    items = soup.find_all("item")[:15]
     results = []
-    for article in articles[:9]:  # Ambil 9 berita untuk 3 kolom
-        try:
-            title = article.find('h2').get_text(strip=True)
-            link = article.find('a')['href']
-            if not link.startswith('http'):
-                link = 'https:' + link
-            time = article.find('div', class_='date').get_text(strip=True)
-            results.append({'title': title, 'link': link, 'time': time})
-        except:
-            continue
+    for it in items:
+        title = it.find("title").text
+        link = it.find("link").text
+        pub = it.find("pubDate").text
+        desc_html = it.find("description").text
+        desc = html2text.html2text(desc_html).strip().replace('\n', ' ')
+        results.append({"title": title, "link": link, "time": pub, "summary": desc})
     return results
 
-# ========== Fungsi Ambil Isi Berita ==========
-def scrape_summary(link):
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    response = requests.get(link, headers=headers)
-    soup = BeautifulSoup(response.text, 'html.parser')
+# ========== Ambil Data ==========
+articles = scrape_cnbc_rss()
 
-    try:
-        paragraphs = soup.find_all('div', class_='detail_text')[0].find_all('p')
-        content = ''
-        for p in paragraphs[:3]:  # Ambil 3 paragraf pertama
-            content += p.get_text(strip=True) + ' '
-        return content
-    except:
-        return ''
-
-# ========== Tampilan Dashboard ==========
-articles = scrape_cnbc()
+# ========== Search Filter ==========
+search_query = st.text_input("🔍 Cari Berita (contoh: saham, IHSG, emiten)", "").lower()
 
 if articles:
-    cols = st.columns(3)
+    filtered_articles = [a for a in articles if search_query in a['title'].lower() or search_query in a['summary'].lower()]
 
-    for idx, article in enumerate(articles):
-        with cols[idx % 3]:
-            st.markdown('<div class="card">', unsafe_allow_html=True)
-            st.markdown(f"### 📊 {article['title']}")
-            st.write(f"*🕒 {article['time']}*")
-            st.write(f"[🔗 Baca Selengkapnya]({article['link']})")
+    if filtered_articles:
+        cols = st.columns(3)
 
-            with st.expander("📄 Ringkasan Berita"):
-                with st.spinner('📥 Mengambil ringkasan...'):
-                    summary = scrape_summary(article['link'])
-                    if summary:
-                        st.write(summary)
-                    else:
-                        st.write("Ringkasan tidak tersedia.")
-            st.markdown('</div>', unsafe_allow_html=True)
+        for idx, art in enumerate(filtered_articles):
+            with cols[idx % 3]:
+                st.markdown('<div class="card">', unsafe_allow_html=True)
+                st.markdown(f"<div class='title'>📊 {art['title']}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='time'>🕒 {art['time']}</div>", unsafe_allow_html=True)
+                st.write(f"[🔗 Baca Selengkapnya]({art['link']})")
+                st.markdown(f"<div class='summary'>{art['summary'][:200]}...</div>", unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.warning("❗ Berita dengan kata kunci tersebut tidak ditemukan.")
 else:
-    st.write("Tidak ada berita terbaru saat ini.")
+    st.write("⛔ Tidak ada berita terbaru saat ini.")
