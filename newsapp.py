@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import time
 
 st.set_page_config(page_title="IDX45 Sector Monitor", layout="wide")
-st.title("📈 IDX45 Sector Performance Monitor with Stock Search")
+st.title("📈 IDX45 Full Monitor with Stock Search & Sector Highlight")
 
 # Sektor dan saham IDX45
 sectors = {
@@ -26,6 +26,7 @@ placeholder = st.empty()
 
 while True:
     sector_perf = {}
+    all_stock_data = []
 
     # Hitung performa sektor
     for sector, tickers in sectors.items():
@@ -38,6 +39,15 @@ while True:
                 change_pct = ((current_price - open_price) / open_price) * 100
                 gains.append(change_pct)
 
+                # Masukkan semua saham ke tabel
+                all_stock_data.append({
+                    'Stock': ticker,
+                    'Sector': sector,
+                    'Current Price': current_price,
+                    'Yesterday Close': open_price,
+                    'Change %': change_pct
+                })
+
         avg_gain = sum(gains) / len(gains) if gains else 0
         sector_perf[sector] = avg_gain
 
@@ -45,10 +55,14 @@ while True:
     sorted_sector = dict(sorted(sector_perf.items(), key=lambda x: x[1], reverse=True))
     top_sector = list(sorted_sector.keys())[0]
 
+    # Buat tabel semua saham
+    all_stocks_df = pd.DataFrame(all_stock_data)
+    all_stocks_df = all_stocks_df.sort_values(by='Change %', ascending=False).reset_index(drop=True)
+
+    # Ambil saham dari sektor terbaik
     stocks = sectors[top_sector]
     stock_data = []
 
-    # Proses saham di sektor terbaik
     for stock in stocks:
         ticker = yf.Ticker(stock)
         hist = ticker.history(period='7d', interval='1h')
@@ -74,11 +88,14 @@ while True:
     with placeholder.container():
         st.subheader(f"🔥 Best Performing Sector: {top_sector} ({sorted_sector[top_sector]:.2f}%)")
         st.write(f"⏱️ Updated at: {pd.Timestamp.now()}")
-        st.dataframe(df[['Stock', 'Current Price', 'SMA 20', 'SMA 50', 'Recommendation']])
 
-        st.subheader("📈 Stock Charts (7 Days)")
+        st.subheader("📊 IDX45 Performance Table")
+        st.dataframe(all_stocks_df)
+
+        st.subheader(f"📈 {top_sector} Sector Stocks - Chart (7 Days)")
+
         for stock_info in stock_data:
-            st.write(f"### {stock_info['Stock']}")
+            st.write(f"### {stock_info['Stock']} ({stock_info['Recommendation']})")
             fig = go.Figure()
 
             fig.add_trace(go.Scatter(x=stock_info['Data'].index, y=stock_info['Data']['Close'], name='Price'))
@@ -88,7 +105,7 @@ while True:
             fig.update_layout(title=f"{stock_info['Stock']} - Last 7 Days", xaxis_title="Date", yaxis_title="Price", legend_title="Indicators")
             st.plotly_chart(fig, use_container_width=True)
 
-        # Tambahkan filter saham manual
+        # Tampilkan saham spesifik yang dicari
         if stock_choice:
             st.subheader("🔍 Performance of Selected Stocks")
             for selected_stock in stock_choice:
