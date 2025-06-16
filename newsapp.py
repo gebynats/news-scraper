@@ -5,8 +5,9 @@ import plotly.graph_objects as go
 import time
 
 st.set_page_config(page_title="IDX45 Sector Monitor", layout="wide")
-st.title("📈 IDX45 Sector Performance Monitor (Auto Refresh)")
+st.title("📈 IDX45 Sector Performance Monitor with Stock Search")
 
+# Sektor dan saham IDX45
 sectors = {
     'Banking': ['BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'BBNI.JK', 'ARTO.JK'],
     'Consumer': ['ICBP.JK', 'UNVR.JK', 'MYOR.JK', 'KLBF.JK', 'SIDO.JK'],
@@ -16,6 +17,9 @@ sectors = {
     'Misc': ['ASII.JK', 'ANTM.JK', 'INDF.JK', 'MDKA.JK']
 }
 
+all_stocks = [item for sublist in sectors.values() for item in sublist]
+stock_choice = st.multiselect('🔎 Cari Saham (Optional)', all_stocks)
+
 refresh_interval = st.number_input('Refresh Interval (seconds)', min_value=5, max_value=3600, value=60)
 
 placeholder = st.empty()
@@ -23,6 +27,7 @@ placeholder = st.empty()
 while True:
     sector_perf = {}
 
+    # Hitung performa sektor
     for sector, tickers in sectors.items():
         gains = []
         for ticker in tickers:
@@ -36,14 +41,14 @@ while True:
         avg_gain = sum(gains) / len(gains) if gains else 0
         sector_perf[sector] = avg_gain
 
+    # Ambil sektor terbaik
     sorted_sector = dict(sorted(sector_perf.items(), key=lambda x: x[1], reverse=True))
     top_sector = list(sorted_sector.keys())[0]
 
     stocks = sectors[top_sector]
     stock_data = []
 
-    chart_tabs = []
-
+    # Proses saham di sektor terbaik
     for stock in stocks:
         ticker = yf.Ticker(stock)
         hist = ticker.history(period='7d', interval='1h')
@@ -72,7 +77,6 @@ while True:
         st.dataframe(df[['Stock', 'Current Price', 'SMA 20', 'SMA 50', 'Recommendation']])
 
         st.subheader("📈 Stock Charts (7 Days)")
-
         for stock_info in stock_data:
             st.write(f"### {stock_info['Stock']}")
             fig = go.Figure()
@@ -83,5 +87,26 @@ while True:
 
             fig.update_layout(title=f"{stock_info['Stock']} - Last 7 Days", xaxis_title="Date", yaxis_title="Price", legend_title="Indicators")
             st.plotly_chart(fig, use_container_width=True)
+
+        # Tambahkan filter saham manual
+        if stock_choice:
+            st.subheader("🔍 Performance of Selected Stocks")
+            for selected_stock in stock_choice:
+                ticker = yf.Ticker(selected_stock)
+                hist = ticker.history(period='7d', interval='1h')
+
+                if len(hist) > 0:
+                    current_price = hist['Close'].iloc[-1]
+                    sma_20 = hist['Close'].rolling(window=20).mean().iloc[-1]
+                    sma_50 = hist['Close'].rolling(window=50).mean().iloc[-1]
+                    recommendation = 'Buy' if current_price > sma_20 > sma_50 else 'Hold'
+
+                    st.write(f"### {selected_stock} - Current Price: {current_price:.2f} ({recommendation})")
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'], name='Price'))
+                    fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'].rolling(window=20).mean(), name='SMA 20'))
+                    fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'].rolling(window=50).mean(), name='SMA 50'))
+                    fig.update_layout(title=f"{selected_stock} - Last 7 Days", xaxis_title="Date", yaxis_title="Price", legend_title="Indicators")
+                    st.plotly_chart(fig, use_container_width=True)
 
     time.sleep(refresh_interval)
