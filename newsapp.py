@@ -1,96 +1,76 @@
 import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-import html2text
+import yfinance as yf
+import pandas as pd
+import time
 
-# ========== Konfigurasi Halaman ==========
-st.set_page_config(page_title="Dashboard Berita CNBC Indonesia", layout="wide")
+st.set_page_config(page_title="Sector & Stock Monitor", layout="wide")
+st.title("📈 Real-Time Sector & Stock Performance Monitor")
 
-# ========== Custom CSS Dark Mode + Fade-In ==========
-st.markdown("""
-    <style>
-        .stApp {
-            background: #121212;
+# Contoh sektor ETF (US based, bisa ganti ke IDX sektor manual kalau mau)
+sectors = {
+    'Technology': 'XLK',
+    'Financials': 'XLF',
+    'Healthcare': 'XLV',
+    'Energy': 'XLE',
+    'Consumer Discretionary': 'XLY'
+}
+
+refresh_interval = st.number_input('Refresh Interval (seconds)', min_value=5, max_value=3600, value=60)
+
+if st.button('Start Monitoring'):
+    placeholder = st.empty()
+
+    while True:
+        sector_perf = {}
+
+        for sector, ticker in sectors.items():
+            data = yf.Ticker(ticker).history(period='1d', interval='1m')
+            if not data.empty:
+                open_price = data.iloc[0]['Open']
+                current_price = data['Close'].iloc[-1]
+                change_pct = ((current_price - open_price) / open_price) * 100
+                sector_perf[sector] = change_pct
+
+        sorted_sector = dict(sorted(sector_perf.items(), key=lambda x: x[1], reverse=True))
+
+        top_sector = list(sorted_sector.keys())[0]
+        st.subheader(f"🔥 Best Performing Sector: {top_sector} ({sorted_sector[top_sector]:.2f}%)")
+
+        # Sample stocks in the top sector
+        sample_stocks = {
+            'Technology': ['AAPL', 'MSFT', 'NVDA'],
+            'Financials': ['JPM', 'BAC', 'WFC'],
+            'Healthcare': ['JNJ', 'PFE', 'MRK'],
+            'Energy': ['XOM', 'CVX', 'COP'],
+            'Consumer Discretionary': ['AMZN', 'TSLA', 'HD']
         }
-        .fade-in {
-            animation: fadeIn 1s ease-in-out;
-        }
-        @keyframes fadeIn {
-            from {opacity: 0;}
-            to {opacity: 1;}
-        }
-        .card {
-            background: #1e1e1e;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            margin-bottom: 20px;
-            min-height: 250px;
-            opacity: 0;
-            animation: fadeIn 1s forwards;
-        }
-        .title {
-            font-size: 18px;
-            font-weight: bold;
-            color: #ffffff;
-        }
-        .summary {
-            font-size: 14px;
-            color: #cccccc;
-        }
-        .time {
-            font-size: 12px;
-            color: #999999;
-        }
-        a {
-            color: #4ea8de;
-            text-decoration: none;
-            font-weight: bold;
-        }
-    </style>
-""", unsafe_allow_html=True)
 
-# ========== Judul ==========
-st.title("📈 Dashboard Berita CNBC Indonesia")
-st.subheader("💼 Berita Pasar Modal dan Saham Jawa Barat (Dark Mode + Animasi)")
+        stocks = sample_stocks[top_sector]
+        stock_data = []
 
-# ========== Fungsi Scrape RSS ==========
-def scrape_cnbc_rss():
-    RSS_URL = "https://www.cnbcindonesia.com/market/rss"
-    resp = requests.get(RSS_URL)
-    soup = BeautifulSoup(resp.text, "xml")
-    items = soup.find_all("item")[:15]
-    results = []
-    for it in items:
-        title = it.find("title").text
-        link = it.find("link").text
-        pub = it.find("pubDate").text
-        desc_html = it.find("description").text
-        desc = html2text.html2text(desc_html).strip().replace('\n', ' ')
-        results.append({"title": title, "link": link, "time": pub, "summary": desc})
-    return results
+        for stock in stocks:
+            ticker = yf.Ticker(stock)
+            hist = ticker.history(period='5d', interval='1m')
 
-# ========== Ambil Data ==========
-articles = scrape_cnbc_rss()
+            if len(hist) > 0:
+                current_price = hist['Close'].iloc[-1]
+                sma_20 = hist['Close'].rolling(window=20).mean().iloc[-1]
+                sma_50 = hist['Close'].rolling(window=50).mean().iloc[-1]
 
-# ========== Search Filter ==========
-search_query = st.text_input("🔍 Cari Berita (contoh: saham, IHSG, emiten)", "").lower()
+                recommendation = 'Buy' if current_price > sma_20 > sma_50 else 'Hold'
 
-if articles:
-    filtered_articles = [a for a in articles if search_query in a['title'].lower() or search_query in a['summary'].lower()]
+                stock_data.append({
+                    'Stock': stock,
+                    'Current Price': current_price,
+                    'SMA 20': sma_20,
+                    'SMA 50': sma_50,
+                    'Recommendation': recommendation
+                })
 
-    if filtered_articles:
-        cols = st.columns(3)
+        df = pd.DataFrame(stock_data)
 
-        for idx, art in enumerate(filtered_articles):
-            with cols[idx % 3]:
-                st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
-                st.markdown(f"<div class='title'>📊 {art['title']}</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='time'>🕒 {art['time']}</div>", unsafe_allow_html=True)
-                st.write(f"[🔗 Baca Selengkapnya]({art['link']})")
-                st.markdown(f"<div class='summary'>{art['summary'][:200]}...</div>", unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        st.warning("❗ Berita dengan kata kunci tersebut tidak ditemukan.")
-else:
-    st.write("⛔ Tidak ada berita terbaru saat ini.")
+        with placeholder.container():
+            st.write(f"⏱️ Updated at: {pd.Timestamp.now()}")
+            st.dataframe(df)
+
+        time.sleep(refresh_interval)
